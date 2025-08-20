@@ -1,0 +1,53 @@
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, FloatType
+transactions_data = [
+    (1, "credit", 50.0),
+    (1, "debit", 90.0),
+    (2, "credit", 100.0),
+    (3, "debit", 57.0),
+    (2, "debit", 150.0)
+]
+transaction_schema = StructType([
+    StructField("customer_id", IntegerType(), True),
+    StructField("transaction_type", StringType(), True),
+    StructField("transaction_amount", FloatType(), True)
+])
+df_tran = spark.createDataFrame(transactions_data, schema=transaction_schema)
+
+
+
+amounts_data = [
+    (1, 5000.0),
+    (2, 6000.0),
+    (3, 8000.0),
+    (4, 10000.0)
+]
+amount_schema = StructType([
+    StructField("customer_id", IntegerType(), True),
+    StructField("current_amount", FloatType(), True)
+])
+df_amt = spark.createDataFrame(amounts_data, schema=amount_schema)
+
+from pyspark.sql.functions import col, when, sum
+
+df_tran_final = df_tran.withColumn(
+    "amt_mdf",
+    when(col("transaction_type") == "credit", col("transaction_amount") * 1)
+    .otherwise(col("transaction_amount") * -1)
+)
+
+result = (
+    df_tran_final.groupBy("customer_id")
+    .agg(sum("amt_mdf").alias("final_amt"))
+    .join(df_amt, on="customer_id", how="right")
+    .withColumn(
+        "balance",
+        when(
+            col("current_amount").isNull() | col("final_amt").isNull(),
+            col("current_amount")
+        ).otherwise(col("current_amount") + col("final_amt"))
+    )
+    .select("customer_id", "balance")
+)
+
+display(result)
+
