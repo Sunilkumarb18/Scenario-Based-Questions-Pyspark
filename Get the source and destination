@@ -1,0 +1,38 @@
+data = [
+    ('A001', 'Tokyo', 'Seoul'),
+    ('A001', 'Singapore', 'Tokyo'),
+    ('A001', 'Seoul', 'Bangkok'),
+    ('A001', 'Bangkok', 'Manila'),
+    ('B002', 'Paris', 'Rome'),
+    ('B002', 'Berlin', 'Paris'),
+    ('B002', 'Rome', 'Madrid'),
+    ('C003', 'Cairo', 'Dubai'),
+    ('C003', 'Istanbul', 'Cairo'),
+    ('C003', 'Dubai', 'Riyadh'),
+    ('C003', 'Riyadh', 'Doha'),
+    ('D004', 'Toronto', 'Montreal'),
+    ('D004', 'Vancouver', 'Toronto'),
+    ('E005', 'Sydney', 'Melbourne')
+]
+
+schema = StructType([
+    StructField("customer", StringType(), True),
+    StructField("start_location", StringType(), True),
+    StructField("end_location", StringType(), True)
+])
+
+
+df = spark.createDataFrame(data=data, schema=schema)
+
+
+from pyspark.sql.functions import count,row_number
+from pyspark.sql.window import Window
+df1 = df.select("customer","start_location")
+df2 = df.select("customer","end_location")
+df_res = df1.union(df2).orderBy("customer").groupBy("customer","start_location").agg(count("start_location").alias("cnt")).filter(col("cnt")==1).drop("cnt")
+wn_spec = Window.partitionBy("customer").orderBy("customer")
+rn = row_number().over(wn_spec)
+df_res = df_res.withColumn("rn",rn)
+df_fn1 = df_res.filter(col("rn")==1).drop("rn")
+df_fn2 = df_res.filter(col("rn")==2).drop("rn").withColumnRenamed("start_location","end_location")
+df_fn1.join(df_fn2, on="customer", how="inner").display()
