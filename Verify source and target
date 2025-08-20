@@ -1,0 +1,14 @@
+source_data = [(10, 'A'), (20, 'B'), (30, 'C'), (40, 'D')]
+source_columns = ['id','name']
+target_data = [(10, 'A'), (20, 'B'), (40, 'X'), (50, 'F')]
+target_columns = ['id','name']
+
+df_src = spark.createDataFrame(data=source_data, schema=source_columns)
+df_tgt = spark.createDataFrame(data=target_data, schema=target_columns)
+
+
+from pyspark.sql.functions import lit
+df_new_in_source = df_src.join(df_tgt, on="id", how="anti").withColumn("result",lit("new in source")).drop("name")
+df_new_in_target = df_tgt.join(df_src, on="id", how="anti").withColumn("result",lit("new in target")).drop("name")
+df_mismatch = df_src.join(df_tgt, (df_src.id == df_tgt.id) & (df_src.name!=df_tgt.name), how="inner").select(df_src.id).withColumn("result",lit("Mismatch"))
+df_new_in_source.union(df_new_in_target).union(df_mismatch).display()
