@@ -1,0 +1,47 @@
+sales_data = [
+    (1, 2019, 1000.00),
+    (1, 2020, 1500.00),
+    (1, 2021, 1200.00),
+    (2, 2019, 500.00),
+    (2, 2020, 700.00),
+    (2, 2021, 900.00),
+    (3, 2019, 400.00),
+    (3, 2020, 450.00),
+    (3, 2021, 300.00)
+]
+
+sales_schema = ['product_id', 'year', 'total_sales_revenue']
+
+sales_df = spark.createDataFrame(data=sales_data, schema=sales_schema)
+
+product_data = [
+    (1, 'Laptops', 'Electronics'),
+    (2, 'Jeans', 'Clothing'),
+    (3, 'Chairs', 'Home Appliances')
+]
+
+product_schema = ['product_id', 'product_name', 'category']
+
+df_products = spark.createDataFrame(data=product_data, schema=product_schema)
+
+
+from pyspark.sql.window import Window
+from pyspark.sql.functions import lag,when,lit
+wn_spec = Window.partitionBy("product_id").orderBy("year")
+rn = lag("total_sales_revenue").over(wn_spec)
+df_sales = df_sales.withColumn("rn",rn).fillna({"rn":0})
+df_sales = df_sales.withColumn(
+    "chk",
+    when(
+        (col("total_sales_revenue") > col("rn")),1
+    ).otherwise(lit(0))
+)
+
+from pyspark.sql.functions import count,sum
+df_grp = df_sales.groupBy("product_id").agg(count("product_id").alias("pro"),sum("chk").alias("chk")).filter(col("pro") == col("chk"))
+df_grp.join(df_products, "product_id", "inner").select(
+    df_products["product_id"],
+    df_products["product_name"],
+    df_products["category"]
+).display()
+
