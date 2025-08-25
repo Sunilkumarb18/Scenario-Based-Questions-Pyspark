@@ -1,0 +1,28 @@
+inp = [
+    (1),
+    (4),
+    (5),
+    (7),
+    (9),
+    (10)
+]
+schema = "inp int"
+df = spark.createDataFrame(inp,schema)
+
+from pyspark.sql.functions import col, max
+
+mx = df.select(
+    max("inp").alias("max_inp")
+)
+var = mx.collect()[0][0]
+df_10 = spark.range(1, var + 1)
+
+
+df_10.join(
+        df,
+        df_10.id == df.inp,
+        how="left"
+    ).filter(
+        col("inp").isNull()
+    ).select("id").display()
+
